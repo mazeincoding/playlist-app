@@ -1,33 +1,34 @@
-const audio = document.getElementById("audio");
-const playlistElement = document.getElementById("playlist");
-let playlist = [];
+const BASE_URL = "https://mazeincoding.github.io/playlist-app/";
 
-const BASE_URL = 'https://mazeincoding.github.io/playlist-app/';
+let playlist = [
+  {
+    title: "Crystal Castles - Kerosene",
+    file: "music/crystal castles - kerosene.mp3",
+  },
+  { title: "Counting Stars", file: "music/Couting Stars.mp3" },
+  {
+    title: "Billie Eilish - Everything I Wanted",
+    file: "music/everything i wanted - billie eilish.mp3",
+  },
+  {
+    title: "The Neighbourhood - Sweater Weather",
+    file: "music/The Neighbourhood - Sweater Weather.mp3",
+  },
+  { title: "Seafret - Atlantis", file: "music/Seafret - Atlantis.mp3" },
+  {
+    title: "David Kushner - Daylight",
+    file: "music/Daylight - David Kushner.mp3",
+  },
+  { title: "Billie Eilish - Lovely", file: "music/Lovely-Billie Eilish.mp3" },
+  { title: "Somewhere Only We Know", file: "music/Somewhere Only We Know.mp3" },
+  { title: "Becky G - Shower", file: "music/Becky G - Shower.mp3" },
+  { title: "Conan Gray - Heather", file: "music/Heather - Conan gray.mp3" },
+  { title: "Bored (Sped Up)", file: "music/bored sped up.mp3" },
+  { title: "Billie Eilish - TV", file: "music/Billie Eilish ~ Tv.mp3" },
+];
 
-async function loadPlaylist() {
-  try {
-    const response = await fetch(`${BASE_URL}music/`);
-    const text = await response.text();
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(text, "text/html");
-    const links = doc.querySelectorAll("a");
-
-    playlist = Array.from(links)
-      .filter((link) => link.href.endsWith(".mp3"))
-      .map((link) => ({
-        title: decodeURIComponent(
-          link.href.split("/").pop().replace(".mp3", "")
-        ),
-        file: `${BASE_URL}music/${link.href.split("/").pop()}`,
-      }));
-
-    renderPlaylist();
-  } catch (error) {
-    console.error("Error loading playlist:", error);
-  }
-}
-
-function renderPlaylist() {
+function loadPlaylist() {
+  const playlistElement = document.getElementById("playlist");
   playlistElement.innerHTML = "";
   playlist.forEach((song, index) => {
     const li = document.createElement("li");
@@ -42,7 +43,8 @@ function renderPlaylist() {
 
 function playSong(index) {
   const song = playlist[index];
-  audio.src = song.file;
+  const audio = document.getElementById("audio");
+  audio.src = `${BASE_URL}${song.file}`;
   audio.play();
 }
 
