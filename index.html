@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simple Music Player</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="bg-white p-8 rounded-lg shadow-md w-96">
+      <h1 class="text-2xl font-bold mb-4">My Playlist</h1>
+      <div id="player" class="mb-4">
+        <audio id="audio" controls class="w-full"></audio>
+      </div>
+      <ul id="playlist" class="space-y-2"></ul>
+    </div>
+    <script src="script.js"></script>
+  </body>
+</html>
