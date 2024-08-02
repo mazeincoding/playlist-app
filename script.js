@@ -2,9 +2,11 @@ const audio = document.getElementById("audio");
 const playlistElement = document.getElementById("playlist");
 let playlist = [];
 
+const BASE_URL = 'https://mazeincoding.github.io/playlist-app/';
+
 async function loadPlaylist() {
   try {
-    const response = await fetch("music/");
+    const response = await fetch(`${BASE_URL}music/`);
     const text = await response.text();
     const parser = new DOMParser();
     const doc = parser.parseFromString(text, "text/html");
@@ -16,7 +18,7 @@ async function loadPlaylist() {
         title: decodeURIComponent(
           link.href.split("/").pop().replace(".mp3", "")
         ),
-        file: `music/${link.href.split("/").pop()}`,
+        file: `${BASE_URL}music/${link.href.split("/").pop()}`,
       }));
 
     renderPlaylist();
