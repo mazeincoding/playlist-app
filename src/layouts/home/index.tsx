@@ -189,12 +189,16 @@ function SongCard({ id, title, artist, duration, cover, url }: Song) {
     usePlaylistStore();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
+  const isCurrentSong = currentSong?.id === id;
+
   const handlePlay = () => {
-    if (currentSong?.id === id) {
+    if (isCurrentSong) {
       togglePlay();
     } else {
       setCurrentSong({ id, title, artist, duration, cover, url });
-      togglePlay();
+      if (!isPlaying) {
+        togglePlay();
+      }
     }
   };
 
@@ -204,7 +208,11 @@ function SongCard({ id, title, artist, duration, cover, url }: Song) {
   };
 
   return (
-    <Card className="p-0">
+    <Card
+      className={`p-0 ${
+        isCurrentSong ? "bg-accent/30 border-foreground/20 border" : ""
+      }`}
+    >
       <CardHeader className="p-0">
         <div className="relative">
           {cover ? (
@@ -237,12 +245,12 @@ function SongCard({ id, title, artist, duration, cover, url }: Song) {
             Delete
           </Button>
           <Button variant="ghost" size="sm" onClick={handlePlay}>
-            {currentSong?.id === id && isPlaying ? (
+            {isCurrentSong && isPlaying ? (
               <Pause className="w-5 h-5 mr-2" />
             ) : (
               <Play className="w-5 h-5 mr-2" />
             )}
-            {isPlaying ? "Pause" : "Play"}
+            {isCurrentSong && isPlaying ? "Pause" : "Play"}
           </Button>
         </div>
       </CardContent>
@@ -261,12 +269,16 @@ function SongListItem({ id, title, artist, duration, cover, url }: Song) {
     usePlaylistStore();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
+  const isCurrentSong = currentSong?.id === id;
+
   const handlePlay = () => {
-    if (currentSong?.id === id) {
+    if (isCurrentSong) {
       togglePlay();
     } else {
       setCurrentSong({ id, title, artist, duration, cover, url });
-      togglePlay();
+      if (!isPlaying) {
+        togglePlay();
+      }
     }
   };
 
@@ -276,7 +288,11 @@ function SongListItem({ id, title, artist, duration, cover, url }: Song) {
   };
 
   return (
-    <div className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-lg">
+    <div
+      className={`flex items-center justify-between p-2 hover:bg-muted/50 rounded-lg ${
+        isCurrentSong ? "bg-green-500/10 border border-green-500/35" : ""
+      }`}
+    >
       <div className="flex items-center gap-4 flex-1 min-w-0">
         {cover ? (
           <Image
@@ -307,12 +323,14 @@ function SongListItem({ id, title, artist, duration, cover, url }: Song) {
           <Trash2 className="w-4 h-4 mr-2" />
         </Button>
         <Button variant="ghost" size="icon" onClick={handlePlay}>
-          {currentSong?.id === id && isPlaying ? (
+          {isCurrentSong && isPlaying ? (
             <Pause className="w-5 h-5" />
           ) : (
             <Play className="w-5 h-5" />
           )}
-          <span className="sr-only">{isPlaying ? "Pause" : "Play"}</span>
+          <span className="sr-only">
+            {isCurrentSong && isPlaying ? "Pause" : "Play"}
+          </span>
         </Button>
       </div>
       <DeleteConfirmDialog
@@ -390,26 +408,16 @@ function PlayerControls() {
 
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.loop = loopMode === "playlist";
-    }
-  }, [loopMode]);
-
-  useEffect(() => {
-    if (audioRef.current) {
       audioRef.current.volume = volume;
     }
   }, [volume]);
 
   const handleEnded = () => {
-    if (loopMode === "playlist") {
-      playNext();
-    } else {
-      togglePlay();
-    }
+    playNext();
   };
 
   const handleVolumeChange = (value: number[]) => {
-    setVolume(value[0] / 100); // Convert the value to a range between 0 and 1
+    setVolume(value[0] / 100);
   };
 
   const handleTimeUpdate = () => {
@@ -441,53 +449,93 @@ function PlayerControls() {
   return (
     <div className="sticky bottom-0 z-10 bg-background p-4 border-t">
       <div className="max-w-screen-xl mx-auto">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 w-full sm:w-auto order-2 sm:order-1">
-            <ControlButton
-              icon={Shuffle}
-              label="Shuffle"
-              onClick={shuffleAndPlay}
-            />
-            <ControlButton
-              icon={SkipBack}
-              label="Previous"
-              onClick={playPrevious}
-            />
-            <ControlButton
-              icon={isPlaying ? Pause : Play}
-              label={isPlaying ? "Pause" : "Play"}
-              onClick={togglePlay}
-            />
-            <ControlButton icon={SkipForward} label="Next" onClick={playNext} />
-            <LoopButton loopMode={loopMode} setLoopMode={setLoopMode} />
+        <div className="flex flex-col gap-4">
+          {currentSong && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                {currentSong.cover ? (
+                  <Image
+                    src={currentSong.cover}
+                    alt={`Cover for ${currentSong.title}`}
+                    width={60}
+                    height={60}
+                    className="aspect-square object-cover"
+                  />
+                ) : (
+                  <div className="w-12 h-12 bg-muted rounded-md flex-shrink-0"></div>
+                )}
+                <div>
+                  <div className="font-medium truncate">
+                    {currentSong.title}
+                  </div>
+                  <div className="text-sm text-muted-foreground truncate">
+                    {currentSong.artist}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <ControlButton
+                  icon={volume === 0 ? VolumeX : Volume2}
+                  label={volume === 0 ? "Unmute" : "Mute"}
+                  onClick={toggleMute}
+                />
+                <Slider
+                  className="w-24 sm:w-32 [&>span:first-child]:h-1 [&>span:first-child]:bg-muted-foreground [&_[role=slider]]:bg-foreground [&_[role=slider]]:w-3 [&_[role=slider]]:h-3 [&_[role=slider]]:border-0 [&>span:first-child_span]:bg-foreground [&_[role=slider]:focus-visible]:ring-0 [&_[role=slider]:focus-visible]:ring-offset-0 [&_[role=slider]:focus-visible]:scale-105 [&_[role=slider]:focus-visible]:transition-transform"
+                  value={[volume * 100]}
+                  onValueChange={handleVolumeChange}
+                  min={0}
+                  max={100}
+                  step={1}
+                />
+              </div>
+            </div>
+          )}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs w-10 text-right">
+                {formatTime(currentTime)}
+              </span>
+              <Slider
+                className="flex-grow [&>span:first-child]:h-1 [&>span:first-child]:bg-muted-foreground [&_[role=slider]]:bg-foreground [&_[role=slider]]:w-3 [&_[role=slider]]:h-3 [&_[role=slider]]:border-0 [&>span:first-child_span]:bg-foreground [&_[role=slider]:focus-visible]:ring-0 [&_[role=slider]:focus-visible]:ring-offset-0 [&_[role=slider]:focus-visible]:scale-105 [&_[role=slider]:focus-visible]:transition-transform"
+                value={[currentTime]}
+                min={0}
+                max={duration}
+                step={1}
+                onValueChange={handleSeek}
+              />
+              <span className="text-xs w-10">{formatTime(duration)}</span>
+            </div>
+            <div className="flex justify-center items-center gap-2">
+              <ControlButton
+                icon={Shuffle}
+                label="Shuffle"
+                onClick={shuffleAndPlay}
+              />
+              <ControlButton
+                icon={SkipBack}
+                label="Previous"
+                onClick={playPrevious}
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                className="w-12 h-12 rounded-full"
+                onClick={togglePlay}
+              >
+                {isPlaying ? (
+                  <Pause className="w-6 h-6" />
+                ) : (
+                  <Play className="w-6 h-6" />
+                )}
+              </Button>
+              <ControlButton
+                icon={SkipForward}
+                label="Next"
+                onClick={playNext}
+              />
+              <LoopButton loopMode={loopMode} setLoopMode={setLoopMode} />
+            </div>
           </div>
-          <div className="flex items-center gap-4 w-full sm:w-auto order-3 sm:order-2">
-            <ControlButton
-              icon={volume === 0 ? VolumeX : Volume2}
-              label={volume === 0 ? "Unmute" : "Mute"}
-              onClick={toggleMute}
-            />
-            <Slider
-              className="w-24 sm:w-32 [&>span:first-child]:h-1 [&>span:first-child]:bg-muted-foreground [&_[role=slider]]:bg-foreground [&_[role=slider]]:w-3 [&_[role=slider]]:h-3 [&_[role=slider]]:border-0 [&>span:first-child_span]:bg-foreground [&_[role=slider]:focus-visible]:ring-0 [&_[role=slider]:focus-visible]:ring-offset-0 [&_[role=slider]:focus-visible]:scale-105 [&_[role=slider]:focus-visible]:transition-transform"
-              value={[volume * 100]} // Convert the volume to a percentage
-              onValueChange={handleVolumeChange}
-              min={0}
-              max={100}
-              step={1}
-            />
-          </div>
-        </div>
-        <div className="flex items-center gap-2 w-full mt-2 order-1 sm:order-3">
-          <span className="text-xs">{formatTime(currentTime)}</span>
-          <Slider
-            className="flex-grow [&>span:first-child]:h-1 [&>span:first-child]:bg-muted-foreground [&_[role=slider]]:bg-foreground [&_[role=slider]]:w-3 [&_[role=slider]]:h-3 [&_[role=slider]]:border-0 [&>span:first-child_span]:bg-foreground [&_[role=slider]:focus-visible]:ring-0 [&_[role=slider]:focus-visible]:ring-offset-0 [&_[role=slider]:focus-visible]:scale-105 [&_[role=slider]:focus-visible]:transition-transform"
-            value={[currentTime]}
-            min={0}
-            max={duration}
-            step={1}
-            onValueChange={handleSeek}
-          />
-          <span className="text-xs">{formatTime(duration)}</span>
         </div>
       </div>
       {currentSong && (
@@ -497,6 +545,7 @@ function PlayerControls() {
           onEnded={handleEnded}
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
+          loop={false}
         />
       )}
     </div>
