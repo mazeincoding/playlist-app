@@ -10,7 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FileDropzone } from "@/components/ui/file-dropzone";
-import { usePlaylistStore, Song } from "@/stores/playlist-store";
+import { usePlaylistStore } from "@/stores/playlist-store";
+import { Song } from "@/types/song";
 import { PlusCircle, UploadIcon, Loader2, ImageIcon, X } from "lucide-react";
 import { Label } from "./ui/label";
 import { ErrorBoundary, FallbackProps } from "react-error-boundary";
@@ -222,6 +223,7 @@ export function AddSongsDialog() {
       title: file.name.replace(/\.[^/.]+$/, ""),
       artist: "Unknown Artist",
       duration: "0:00",
+      downloaded: false,
     }));
 
     setSongs(newSongs);
