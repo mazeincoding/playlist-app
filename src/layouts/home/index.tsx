@@ -1,43 +1,32 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  LayoutGrid,
   Search,
   Play,
-  FastForward,
   Repeat,
   Shuffle,
   SkipForward,
   Volume2,
   VolumeX,
   LucideIcon,
-  List,
   Repeat1,
   SkipBack,
-  PlusCircle,
   Pause,
-  Trash2,
+  MoreHorizontal,
+  Info,
+  Download,
+  DownloadIcon,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
-import { usePlaylistStore, Song, LoopMode } from "@/stores/playlist-store";
+import { usePlaylistStore, LoopMode } from "@/stores/playlist-store";
+import { Song } from "@/types/song";
 import { AddSongsDialog } from "@/components/add-songs-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
-import { useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,78 +37,144 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { PlaylistInfoDialog } from "@/components/playlist-info-dialog";
+import { Badge } from "@/components/ui/badge";
 
 export default function HomeLayout() {
-  const { viewMode, loopMode, fetchSongs, resetPlayingState } =
-    usePlaylistStore();
+  const {
+    fetchSongs,
+    resetPlayingState,
+    filteredSongs,
+    getTotalDuration,
+    currentSong,
+  } = usePlaylistStore();
+  const [isCurrentSongVisible, setIsCurrentSongVisible] = useState(true);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchSongs();
-    resetPlayingState(); // Reset the playing state when the component mounts
+    resetPlayingState();
   }, [fetchSongs, resetPlayingState]);
 
+  useEffect(() => {
+    console.log("Current song visibility changed:", isCurrentSongVisible);
+  }, [isCurrentSongVisible]);
+
+  useEffect(() => {
+    console.log("Current song changed:", currentSong);
+  }, [currentSong]);
+
+  const scrollToCurrentSong = () => {
+    console.log("Attempting to scroll to current song");
+    const currentSongElement = document.getElementById(
+      `song-${currentSong?.id}`
+    );
+    const scrollContainer = scrollContainerRef.current;
+
+    if (currentSongElement && scrollContainer) {
+      console.log("Scrolling to song:", currentSong?.title);
+
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const songRect = currentSongElement.getBoundingClientRect();
+      const songHeight = songRect.height;
+      const containerHeight = containerRect.height;
+
+      let targetScrollTop =
+        currentSongElement.offsetTop -
+        containerRect.top -
+        scrollContainer.offsetTop;
+
+      // Adjust scroll position to center the song if there's enough space
+      if (songHeight < containerHeight) {
+        targetScrollTop -= (containerHeight - songHeight) / 2;
+      }
+
+      // Ensure we don't scroll past the bottom of the container
+      const maxScrollTop = scrollContainer.scrollHeight - containerHeight;
+      targetScrollTop = Math.min(targetScrollTop, maxScrollTop);
+
+      // Ensure we don't scroll above the top of the container
+      targetScrollTop = Math.max(targetScrollTop, 0);
+
+      scrollContainer.scrollTo({
+        top: targetScrollTop,
+        behavior: "smooth",
+      });
+    } else {
+      console.log("Failed to scroll: Element or container not found");
+    }
+  };
+
   return (
-    <div className="flex flex-col h-screen bg-background text-foreground">
-      <Header />
-      <Main viewMode={viewMode} />
+    <div className="flex flex-col h-full bg-background text-foreground">
+      <div
+        className="flex-grow overflow-auto relative"
+        ref={scrollContainerRef}
+      >
+        <Header />
+        <Main setIsCurrentSongVisible={setIsCurrentSongVisible} />
+        {!isCurrentSongVisible && currentSong && (
+          <Badge
+            onClick={scrollToCurrentSong}
+            className="bottom-2 left-1/2 transform sticky -translate-x-1/2 z-50 bg-background text-muted-foreground hover:text-foreground hover:bg-accent/50 hover:border-foreground/25 cursor-pointer border border-border backdrop-blur-md"
+          >
+            Jump to playing song
+          </Badge>
+        )}
+      </div>
       <PlayerControls />
     </div>
   );
 }
 
 function Header() {
+  const [showInfo, setShowInfo] = useState(false);
+  const { filteredSongs, getTotalDuration } = usePlaylistStore();
+
   return (
-    <header className="sticky top-0 z-10 flex flex-col md:flex-row items-center justify-between px-4 py-3 bg-background sm:px-6 gap-4">
-      <div className="flex items-center gap-4 w-full md:w-auto">
-        <Link href="#" className="text-2xl font-bold" prefetch={false}>
-          Playlist
-        </Link>
-        <ViewModeDropdown />
-        <div className="ml-auto md:hidden">
+    <header className="sticky top-0 z-10 flex flex-col sm:flex-row items-center border-b justify-between px-4 py-3 bg-background/50 backdrop-blur-md sm:px-6 gap-4">
+      <div className="flex items-center w-full sm:w-auto justify-between">
+        <div className="space-x-4">
+          <Link href="#" className="text-2xl font-bold" prefetch={false}>
+            Playlist
+          </Link>
+          <Button variant="ghost" size="icon" onClick={() => setShowInfo(true)}>
+            <Info className="h-4 w-4" />
+            <span className="sr-only">More options</span>
+          </Button>
+        </div>
+        {showInfo && (
+          <PlaylistInfoDialog
+            open={showInfo}
+            onOpenChange={setShowInfo}
+            songCount={filteredSongs().length}
+            totalDuration={getTotalDuration()}
+          />
+        )}
+        <div className="block sm:hidden">
           <AddSongsDialog />
         </div>
       </div>
-      <div className="flex items-center gap-4 w-full md:w-auto flex-grow justify-end">
+
+      <div className="flex items-center gap-4 w-full sm:w-auto flex-grow justify-end">
         <SearchBar />
-        <div className="hidden md:block">
+        <div className="hidden sm:block">
           <AddSongsDialog />
         </div>
       </div>
+      <PlaylistInfoDialog
+        open={showInfo}
+        onOpenChange={setShowInfo}
+        songCount={filteredSongs().length}
+        totalDuration={getTotalDuration()}
+      />
     </header>
-  );
-}
-
-function ViewModeDropdown() {
-  const { viewMode, setViewMode } = usePlaylistStore();
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="hover:bg-muted/50 flex-shrink-0"
-        >
-          {viewMode === "grid" ? (
-            <LayoutGrid className="w-5 h-5" />
-          ) : (
-            <List className="w-5 h-5" />
-          )}
-          <span className="sr-only">View mode</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuLabel>View mode</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuRadioGroup
-          value={viewMode}
-          onValueChange={(value) => setViewMode(value as "grid" | "list")}
-        >
-          <DropdownMenuRadioItem value="grid">Grid</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="list">List</DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 
@@ -127,14 +182,14 @@ function SearchBar() {
   const { searchQuery, setSearchQuery } = usePlaylistStore();
 
   return (
-    <div className="relative flex-1 w-full md:max-w-md flex-grow">
+    <div className="relative flex-1 w-full sm:max-w-md flex-grow">
       <div className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground">
         <Search className="w-4 h-4" />
       </div>
       <Input
         type="search"
         placeholder="Search songs..."
-        className="w-full pl-8 rounded-lg bg-muted"
+        className="w-full pl-8 rounded-lg bg-muted/35 focus-visible:bg-muted/50 focus-visible:border-foreground/15"
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
       />
@@ -142,140 +197,206 @@ function SearchBar() {
   );
 }
 
-function Main({ viewMode }: { viewMode: "grid" | "list" }) {
-  const { filteredSongs, isLoading } = usePlaylistStore();
-
-  if (isLoading) {
-    return (
-      <main className="flex-1 overflow-auto p-4">
-        {viewMode === "grid" ? (
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {Array.from({ length: 10 }).map((_, index) => (
-              <SongCardSkeleton key={index} />
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {Array.from({ length: 10 }).map((_, index) => (
-              <SongListItemSkeleton key={index} />
-            ))}
-          </div>
-        )}
-      </main>
-    );
-  }
+function Main({
+  setIsCurrentSongVisible,
+}: {
+  setIsCurrentSongVisible: (visible: boolean) => void;
+}) {
+  const { filteredSongs, isLoading, getTotalDuration, currentSong } =
+    usePlaylistStore();
 
   return (
     <main className="flex-1 overflow-auto p-4">
-      {viewMode === "grid" ? (
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {filteredSongs().map((song, index) => (
-            <SongCard key={index} {...song} />
-          ))}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {filteredSongs().map((song, index) => (
-            <SongListItem key={index} {...song} />
-          ))}
-        </div>
-      )}
+      <div className="flex flex-col gap-2">
+        {isLoading
+          ? Array.from({ length: 10 }).map((_, index) => (
+              <SongListItemSkeleton key={index} />
+            ))
+          : filteredSongs().map((song, index) => (
+              <SongListItem
+                key={index}
+                {...song}
+                isCurrentSong={song.id === currentSong?.id}
+                setIsCurrentSongVisible={setIsCurrentSongVisible}
+              />
+            ))}
+      </div>
     </main>
   );
 }
 
-function SongCard({ id, title, artist, duration, cover, url }: Song) {
-  const { currentSong, setCurrentSong, togglePlay, isPlaying, deleteSong } =
-    usePlaylistStore();
+function SongControls({
+  song,
+  isCurrentSong,
+  isPlaying,
+  onPlay,
+  onDelete,
+  onIgnore,
+  onUnignore,
+  isIgnored,
+}: {
+  song: Song;
+  isCurrentSong: boolean;
+  isPlaying: boolean;
+  onPlay: () => void;
+  onDelete: () => void;
+  onIgnore: () => void;
+  onUnignore: () => void;
+  isIgnored: boolean;
+}) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showSongOptions, setShowSongOptions] = useState(false);
+  const { downloadSong, undownloadSong, isDownloaded, downloadingSongs } =
+    usePlaylistStore();
 
-  const isCurrentSong = currentSong?.id === id;
-
-  const handlePlay = () => {
-    if (isCurrentSong) {
-      togglePlay();
-    } else {
-      setCurrentSong({ id, title, artist, duration, cover, url });
-      if (!isPlaying) {
-        togglePlay();
-      }
-    }
+  const handleDownload = async () => {
+    await downloadSong(song.id);
   };
 
-  const handleDelete = async () => {
-    await deleteSong(id);
-    setShowDeleteDialog(false);
+  const handleUndownload = async () => {
+    await undownloadSong(song.id);
   };
 
   return (
-    <Card
-      className={`p-0 ${
-        isCurrentSong ? "bg-accent/30 border-foreground/20 border" : ""
-      }`}
-    >
-      <CardHeader className="p-0">
-        <div className="relative">
-          {cover ? (
-            <Image
-              src={cover}
-              alt={`Cover for ${title}`}
-              width={300}
-              height={300}
-              className="aspect-square object-cover"
-            />
+    <div className="flex gap-2 items-center">
+      <div className="flex items-center">
+        <Button variant="ghost" size="icon" onClick={onPlay}>
+          {isCurrentSong && isPlaying ? (
+            <Pause className="w-4 h-4" />
           ) : (
-            <div className="aspect-square bg-muted rounded-lg" />
+            <Play className="w-4 h-4" />
           )}
-        </div>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3 p-4">
-        <div className="flex flex-col gap-1">
-          <h3 className="text-lg font-medium truncate">{title}</h3>
-          <p className="text-sm text-muted-foreground truncate">{artist}</p>
-          <p className="text-sm text-muted-foreground">{duration}</p>
-        </div>
-        <div className="flex justify-between items-center">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-red-500 hover:text-red-500 hover:bg-destructive/35"
-            onClick={() => setShowDeleteDialog(true)}
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete
-          </Button>
-          <Button variant="ghost" size="sm" onClick={handlePlay}>
-            {isCurrentSong && isPlaying ? (
-              <Pause className="w-5 h-5 mr-2" />
+        </Button>
+        <DropdownMenu open={showSongOptions} onOpenChange={setShowSongOptions}>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <MoreHorizontal className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            {isDownloaded(song.id) ? (
+              <DropdownMenuItem onClick={handleUndownload}>
+                Undownload
+              </DropdownMenuItem>
             ) : (
-              <Play className="w-5 h-5 mr-2" />
+              <DropdownMenuItem onClick={handleDownload}>
+                Download
+              </DropdownMenuItem>
             )}
-            {isCurrentSong && isPlaying ? "Pause" : "Play"}
-          </Button>
-        </div>
-      </CardContent>
+            {isIgnored ? (
+              <DropdownMenuItem onClick={onUnignore}>Unignore</DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={onIgnore}>Ignore</DropdownMenuItem>
+            )}
+            <DropdownMenuItem
+              onClick={() => setShowDeleteDialog(true)}
+              className="text-destructive focus:text-destructive-foreground focus:bg-destructive"
+            >
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
       <DeleteConfirmDialog
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
-        onConfirm={handleDelete}
-        songTitle={title}
+        onConfirm={onDelete}
+        songTitle={song.title}
       />
-    </Card>
+    </div>
   );
 }
+function SongListItem({
+  id,
+  title,
+  artist,
+  duration,
+  cover,
+  url,
+  isCurrentSong,
+  setIsCurrentSongVisible,
+  coverDownloaded,
+}: Song & {
+  isCurrentSong: boolean;
+  setIsCurrentSongVisible: (visible: boolean) => void;
+}) {
+  const {
+    currentSong,
+    setCurrentSong,
+    togglePlay,
+    isPlaying,
+    deleteSong,
+    ignoreSong,
+    unignoreSong,
+    isIgnored,
+    isDownloaded,
+    downloadSong,
+    undownloadSong,
+    downloadingSongs,
+    getDownloadedCoverBlob,
+    isOnline,
+  } = usePlaylistStore();
 
-function SongListItem({ id, title, artist, duration, cover, url }: Song) {
-  const { currentSong, setCurrentSong, togglePlay, isPlaying, deleteSong } =
-    usePlaylistStore();
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const songRef = useRef<HTMLDivElement>(null);
+  const songIsIgnored = isIgnored(id);
+  const [coverSrc, setCoverSrc] = useState(cover);
 
-  const isCurrentSong = currentSong?.id === id;
+  useEffect(() => {
+    async function loadCachedCover() {
+      if (!isOnline && coverDownloaded) {
+        const blob = await getDownloadedCoverBlob(id);
+        if (blob) {
+          setCoverSrc(URL.createObjectURL(blob));
+        }
+      } else {
+        setCoverSrc(cover);
+      }
+    }
+    loadCachedCover();
+  }, [isOnline, coverDownloaded, id, cover, getDownloadedCoverBlob]);
+
+  useEffect(() => {
+    if (isCurrentSong) {
+      console.log("Setting up Intersection Observer for song:", title);
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          console.log(
+            "Intersection changed for song:",
+            title,
+            "Is intersecting:",
+            entry.isIntersecting
+          );
+          setIsCurrentSongVisible(entry.isIntersecting);
+        },
+        { threshold: 0.5 }
+      );
+
+      if (songRef.current) {
+        observer.observe(songRef.current);
+      }
+
+      return () => {
+        if (songRef.current) {
+          console.log("Cleaning up Intersection Observer for song:", title);
+          observer.unobserve(songRef.current);
+        }
+      };
+    }
+  }, [isCurrentSong, setIsCurrentSongVisible, title]);
 
   const handlePlay = () => {
     if (isCurrentSong) {
       togglePlay();
     } else {
-      setCurrentSong({ id, title, artist, duration, cover, url });
+      setCurrentSong({
+        id,
+        title,
+        artist,
+        duration,
+        cover,
+        url,
+        downloaded: isDownloaded(id),
+      });
       if (!isPlaying) {
         togglePlay();
       }
@@ -284,19 +405,28 @@ function SongListItem({ id, title, artist, duration, cover, url }: Song) {
 
   const handleDelete = async () => {
     await deleteSong(id);
-    setShowDeleteDialog(false);
+  };
+
+  const handleIgnore = () => {
+    ignoreSong(id);
+  };
+
+  const handleUnignore = () => {
+    unignoreSong(id);
   };
 
   return (
     <div
-      className={`flex items-center justify-between p-2 hover:bg-muted/50 rounded-lg ${
-        isCurrentSong ? "bg-green-500/10 border border-green-500/35" : ""
-      }`}
+      ref={songRef}
+      id={`song-${id}`}
+      className={`flex items-center justify-between p-1.5 px-4 hover:bg-muted/50 rounded-lg ${
+        isCurrentSong ? "bg-accent/30 border-foreground/20 border" : ""
+      } ${songIsIgnored ? "opacity-50" : ""}`}
     >
       <div className="flex items-center gap-4 flex-1 min-w-0">
-        {cover ? (
+        {coverSrc ? (
           <Image
-            src={cover}
+            src={coverSrc}
             alt={`${title} cover`}
             width={48}
             height={48}
@@ -306,55 +436,47 @@ function SongListItem({ id, title, artist, duration, cover, url }: Song) {
           <div className="w-12 h-12 bg-muted rounded-lg flex-shrink-0" />
         )}
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium truncate">{title}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-medium truncate">{title}</h3>
+            <div className="hidden sm:block">
+              {isDownloaded(id) ? (
+                <Download className="w-4 h-4 text-green-500" />
+              ) : downloadingSongs.includes(id) ? (
+                <DownloadAnimation />
+              ) : null}
+            </div>
+          </div>
           <p className="text-sm text-muted-foreground truncate">{artist}</p>
+          <p className="text-sm text-muted-foreground truncate">{duration}</p>
         </div>
       </div>
-      <div className="flex items-center gap-4 flex-shrink-0">
-        <p className="text-sm text-muted-foreground hidden sm:block">
-          {duration}
-        </p>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-red-500 hover:text-red-500 hover:bg-destructive/35"
-          onClick={() => setShowDeleteDialog(true)}
-        >
-          <Trash2 className="w-4 h-4 mr-2" />
-        </Button>
-        <Button variant="ghost" size="icon" onClick={handlePlay}>
-          {isCurrentSong && isPlaying ? (
-            <Pause className="w-5 h-5" />
-          ) : (
-            <Play className="w-5 h-5" />
-          )}
-          <span className="sr-only">
-            {isCurrentSong && isPlaying ? "Pause" : "Play"}
-          </span>
-        </Button>
+      <div className="flex items-center flex-shrink-0">
+        <SongControls
+          song={{
+            id,
+            title,
+            artist,
+            duration,
+            cover,
+            url,
+            downloaded: isDownloaded(id),
+          }}
+          isCurrentSong={isCurrentSong}
+          isPlaying={isPlaying}
+          onPlay={handlePlay}
+          onDelete={handleDelete}
+          onIgnore={handleIgnore}
+          onUnignore={handleUnignore}
+          isIgnored={songIsIgnored}
+        />
       </div>
-      <DeleteConfirmDialog
-        isOpen={showDeleteDialog}
-        onClose={() => setShowDeleteDialog(false)}
-        onConfirm={handleDelete}
-        songTitle={title}
-      />
     </div>
   );
 }
 
-function SongCardSkeleton() {
+function DownloadAnimation() {
   return (
-    <Card className="p-4">
-      <CardContent className="flex flex-col gap-3 relative p-0">
-        <Skeleton className="aspect-square rounded-lg" />
-        <div className="flex flex-col gap-1">
-          <Skeleton className="h-5 w-3/4" />
-          <Skeleton className="h-4 w-1/2" />
-          <Skeleton className="h-4 w-1/4" />
-        </div>
-      </CardContent>
-    </Card>
+    <DownloadIcon className="w-4 h-4 text-muted-foreground animate-pulse" />
   );
 }
 
@@ -393,8 +515,11 @@ function PlayerControls() {
     duration,
     setCurrentTime,
     setDuration,
+    getDownloadedCoverBlob,
+    isOnline
   } = usePlaylistStore();
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [coverSrc, setCoverSrc] = useState(currentSong?.cover);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -412,8 +537,29 @@ function PlayerControls() {
     }
   }, [volume]);
 
+  useEffect(() => {
+    async function loadCachedCover() {
+      if (currentSong) {
+        if (!isOnline && currentSong.coverDownloaded) {
+          const blob = await getDownloadedCoverBlob(currentSong.id);
+          if (blob) {
+            setCoverSrc(URL.createObjectURL(blob));
+          }
+        } else {
+          setCoverSrc(currentSong.cover);
+        }
+      }
+    }
+    loadCachedCover();
+  }, [isOnline, currentSong, getDownloadedCoverBlob]);
+
   const handleEnded = () => {
-    playNext();
+    if (loopMode === "single" && audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play();
+    } else {
+      playNext();
+    }
   };
 
   const handleVolumeChange = (value: number[]) => {
@@ -446,6 +592,8 @@ function PlayerControls() {
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
 
+  if (!currentSong) return null;
+
   return (
     <div className="sticky bottom-0 z-10 bg-background p-4 border-t">
       <div className="max-w-screen-xl mx-auto">
@@ -453,9 +601,9 @@ function PlayerControls() {
           {currentSong && (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                {currentSong.cover ? (
+                {coverSrc ? (
                   <Image
-                    src={currentSong.cover}
+                    src={coverSrc}
                     alt={`Cover for ${currentSong.title}`}
                     width={60}
                     height={60}
@@ -480,7 +628,7 @@ function PlayerControls() {
                   onClick={toggleMute}
                 />
                 <Slider
-                  className="w-24 sm:w-32 [&>span:first-child]:h-1 [&>span:first-child]:bg-muted-foreground [&_[role=slider]]:bg-foreground [&_[role=slider]]:w-3 [&_[role=slider]]:h-3 [&_[role=slider]]:border-0 [&>span:first-child_span]:bg-foreground [&_[role=slider]:focus-visible]:ring-0 [&_[role=slider]:focus-visible]:ring-offset-0 [&_[role=slider]:focus-visible]:scale-105 [&_[role=slider]:focus-visible]:transition-transform"
+                  className="w-24 hidden md:flex sm:w-32 [&>span:first-child]:h-1 [&>span:first-child]:bg-muted-foreground [&_[role=slider]]:bg-foreground [&_[role=slider]]:w-3 [&_[role=slider]]:h-3 [&_[role=slider]]:border-0 [&>span:first-child_span]:bg-foreground [&_[role=slider]:focus-visible]:ring-0 [&_[role=slider]:focus-visible]:ring-offset-0 [&_[role=slider]:focus-visible]:scale-105 [&_[role=slider]:focus-visible]:transition-transform"
                   value={[volume * 100]}
                   onValueChange={handleVolumeChange}
                   min={0}
@@ -533,7 +681,11 @@ function PlayerControls() {
                 label="Next"
                 onClick={playNext}
               />
-              <LoopButton loopMode={loopMode} setLoopMode={setLoopMode} />
+              <LoopButton
+                loopMode={loopMode}
+                setLoopMode={setLoopMode}
+                disabled={!currentSong}
+              />
             </div>
           </div>
         </div>
@@ -545,7 +697,7 @@ function PlayerControls() {
           onEnded={handleEnded}
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
-          loop={false}
+          loop={false} // We're handling looping manually now
         />
       )}
     </div>
@@ -577,25 +729,38 @@ function ControlButton({
 function LoopButton({
   loopMode,
   setLoopMode,
+  disabled,
 }: {
   loopMode: LoopMode;
   setLoopMode: (mode: LoopMode) => void;
+  disabled: boolean;
 }) {
   const handleClick = () => {
-    setLoopMode(loopMode === "none" ? "playlist" : "none");
+    if (disabled) return;
+    setLoopMode(
+      loopMode === "none"
+        ? "single"
+        : loopMode === "single"
+        ? "playlist"
+        : "none"
+    );
+  };
+
+  const getIcon = () => {
+    switch (loopMode) {
+      case "single":
+        return <Repeat1 className="w-5 h-5 text-green-500" />;
+      case "playlist":
+        return <Repeat className="w-5 h-5 text-green-500" />;
+      default:
+        return <Repeat className="w-5 h-5" />;
+    }
   };
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="hover:bg-muted/50"
-      onClick={handleClick}
-    >
-      <Repeat
-        className={`w-5 h-5 ${loopMode === "playlist" ? "text-green-500" : ""}`}
-      />
-      <span className="sr-only">Loop {loopMode}</span>
+    <Button variant="ghost" size="icon" onClick={handleClick}>
+      {getIcon()}
+      <span className="sr-only">Loop {disabled ? "disabled" : loopMode}</span>
     </Button>
   );
 }

@@ -64,7 +64,7 @@ export function FileDropzone({ onDrop }: FileDropzoneProps) {
       className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors duration-200 ${
         isDragging
           ? "border-primary bg-primary/10"
-          : "border-border hover:border-primary"
+          : "border-border  hover:bg-foreground/5 hover:border-foreground/25"
       }`}
     >
       <input {...getInputProps()} />

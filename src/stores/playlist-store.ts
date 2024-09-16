@@ -1,26 +1,18 @@
 import { create } from "zustand";
 import { createClient } from "@/utils/supabase/client";
 import { persist } from "zustand/middleware";
+import { openDB } from "idb";
+import { Song } from "@/types/song";
 
-export type ViewMode = "grid" | "list";
-export type LoopMode = "none" | "playlist" | "single";
-
-export type Song = {
-  id: number;
-  title: string;
-  artist: string;
-  duration: string;
-  cover?: string | null;
-  url?: string;
-};
+export type LoopMode = "none" | "single" | "playlist";
 
 interface PlaylistStore {
-  viewMode: ViewMode;
   loopMode: LoopMode;
   songs: Song[];
   searchQuery: string;
   isLoading: boolean;
-  setViewMode: (mode: ViewMode) => void;
+  isOnline: boolean;
+  setIsOnline: (status: boolean) => void;
   setLoopMode: (mode: LoopMode) => void;
   setSongs: (songs: Song[]) => void;
   setSearchQuery: (query: string) => void;
@@ -45,17 +37,31 @@ interface PlaylistStore {
   duration: number;
   setCurrentTime: (time: number) => void;
   setDuration: (duration: number) => void;
+  getTotalDuration: () => string;
+  ignoredSongs: number[];
+  ignoreSong: (songId: number) => void;
+  unignoreSong: (songId: number) => void;
+  isIgnored: (songId: number) => boolean;
+  downloadSong: (songId: number) => Promise<void>;
+  undownloadSong: (songId: number) => Promise<void>;
+  isDownloaded: (songId: number) => boolean;
+  getDownloadedSongBlob: (songId: number) => Promise<Blob | null>;
+  downloadingSongs: number[];
+  addDownloadingSong: (songId: number) => void;
+  removeDownloadingSong: (songId: number) => void;
+  getDownloadedCoverBlob: (songId: number) => Promise<Blob | null>;
 }
 
 export const usePlaylistStore = create(
   persist<PlaylistStore>(
     (set, get) => ({
-      viewMode: "grid",
       loopMode: "none",
       songs: [],
       searchQuery: "",
       isLoading: true,
-      setViewMode: (mode) => set({ viewMode: mode }),
+      ignoredSongs: [],
+      isOnline: true,
+      setIsOnline: (status) => set({ isOnline: status }),
       setLoopMode: (mode) => set({ loopMode: mode }),
       setSongs: (songs) => set({ songs }),
       setSearchQuery: (query) => set({ searchQuery: query }),
@@ -73,6 +79,13 @@ export const usePlaylistStore = create(
         set((state) => ({ songs: [...state.songs, ...newSongs] })),
       fetchSongs: async () => {
         set({ isLoading: true });
+        const { isOnline } = get();
+        if (!isOnline) {
+          console.warn("Offline: Using cached songs");
+          set({ isLoading: false });
+          return;
+        }
+
         const supabase = createClient();
         const { data, error } = await supabase.from("songs").select("*");
 
@@ -82,14 +95,20 @@ export const usePlaylistStore = create(
           return;
         }
 
-        const formattedSongs: Song[] = data.map((song) => ({
-          id: song.id,
-          title: song.name,
-          artist: song.artist,
-          duration: formatDuration(song.length),
-          cover: song.cover, // The cover URL is now stored directly in the database
-          url: song.url,
-        }));
+        const formattedSongs: Song[] = await Promise.all(
+          data.map(async (song) => {
+            const isDownloaded = await checkIfSongIsDownloaded(song.id);
+            return {
+              id: song.id,
+              title: song.name,
+              artist: song.artist,
+              duration: formatDuration(song.length),
+              cover: song.cover,
+              url: song.url,
+              downloaded: isDownloaded,
+            };
+          })
+        );
 
         set({ songs: formattedSongs, isLoading: false });
       },
@@ -123,9 +142,19 @@ export const usePlaylistStore = create(
       setCurrentSong: (song) => set({ currentSong: song }),
       togglePlay: () => set((state) => ({ isPlaying: !state.isPlaying })),
       playNext: () => {
-        const { songs, currentSong, loopMode } = get();
+        const { songs, currentSong, loopMode, ignoredSongs } = get();
         const currentIndex = songs.findIndex((s) => s.id === currentSong?.id);
         let nextIndex = (currentIndex + 1) % songs.length;
+
+        // Skip ignored songs
+        while (ignoredSongs.includes(songs[nextIndex].id)) {
+          nextIndex = (nextIndex + 1) % songs.length;
+          if (nextIndex === currentIndex) {
+            // If we've looped through all songs and they're all ignored, stop playing
+            set({ currentSong: null, isPlaying: false });
+            return;
+          }
+        }
 
         if (nextIndex === 0 && loopMode === "none") {
           set({ currentSong: null, isPlaying: false });
@@ -135,9 +164,20 @@ export const usePlaylistStore = create(
       },
 
       playPrevious: () => {
-        const { songs, currentSong } = get();
+        const { songs, currentSong, ignoredSongs } = get();
         const currentIndex = songs.findIndex((s) => s.id === currentSong?.id);
-        const previousIndex = (currentIndex - 1 + songs.length) % songs.length;
+        let previousIndex = (currentIndex - 1 + songs.length) % songs.length;
+
+        // Skip ignored songs
+        while (ignoredSongs.includes(songs[previousIndex].id)) {
+          previousIndex = (previousIndex - 1 + songs.length) % songs.length;
+          if (previousIndex === currentIndex) {
+            // If we've looped through all songs and they're all ignored, stop playing
+            set({ currentSong: null, isPlaying: false });
+            return;
+          }
+        }
+
         set({ currentSong: songs[previousIndex], isPlaying: true });
       },
       volume: 1,
@@ -205,17 +245,143 @@ export const usePlaylistStore = create(
       duration: 0,
       setCurrentTime: (time) => set({ currentTime: time }),
       setDuration: (duration) => set({ duration: duration }),
+      getTotalDuration: () => {
+        const { songs } = get();
+        const totalSeconds = songs.reduce((total, song) => {
+          return total + parseDuration(song.duration);
+        }, 0);
+        return formatDuration(totalSeconds);
+      },
+      ignoreSong: (songId) =>
+        set((state) => ({ ignoredSongs: [...state.ignoredSongs, songId] })),
+      unignoreSong: (songId) =>
+        set((state) => ({
+          ignoredSongs: state.ignoredSongs.filter((id) => id !== songId),
+        })),
+      isIgnored: (songId) => get().ignoredSongs.includes(songId),
+      downloadSong: async (songId: number) => {
+        const { songs, addDownloadingSong, removeDownloadingSong } = get();
+        const songToDownload = songs.find((song) => song.id === songId);
+
+        if (!songToDownload || !songToDownload.url) {
+          console.error("Song not found or URL is missing");
+          return;
+        }
+
+        try {
+          addDownloadingSong(songId);
+          // Fetch the song file with cache-busting query parameter
+          const response = await fetch(
+            `${songToDownload.url}?t=${Date.now()}`,
+            {
+              cache: "no-store",
+            }
+          );
+          if (!response.ok) throw new Error("Network response was not ok");
+          const blob = await response.blob();
+
+          // Save the file to IndexedDB
+          const db = await openDB("MusicPlayerDB", 1, {
+            upgrade(db) {
+              db.createObjectStore("songs");
+              db.createObjectStore("covers");
+            },
+          });
+
+          await db.put("songs", blob, songId.toString());
+
+          // Download and cache the cover if it exists
+          if (songToDownload.cover) {
+            const coverResponse = await fetch(songToDownload.cover);
+            if (coverResponse.ok) {
+              const coverBlob = await coverResponse.blob();
+              await db.put("covers", coverBlob, songId.toString());
+            }
+          }
+
+          // Update local state to mark both song and cover as downloaded
+          set((state) => ({
+            songs: state.songs.map((song) =>
+              song.id === songId
+                ? { ...song, downloaded: true, coverDownloaded: true }
+                : song
+            ),
+          }));
+
+          removeDownloadingSong(songId);
+          console.log(`Song "${songToDownload.title}" cached successfully`);
+        } catch (error) {
+          console.error("Error caching song:", error);
+          removeDownloadingSong(songId);
+        }
+      },
+
+      getDownloadedCoverBlob: async (songId: number) => {
+        try {
+          const db = await openDB("MusicPlayerDB", 1);
+          return await db.get("covers", songId.toString());
+        } catch (error) {
+          console.error("Error retrieving cached cover:", error);
+          return null;
+        }
+      },
+
+      // Update the undownloadSong function to remove the cover as well
+      undownloadSong: async (songId: number) => {
+        try {
+          const db = await openDB("MusicPlayerDB", 1);
+          await db.delete("songs", songId.toString());
+          await db.delete("covers", songId.toString());
+
+          set((state) => ({
+            songs: state.songs.map((song) =>
+              song.id === songId
+                ? { ...song, downloaded: false, coverDownloaded: false }
+                : song
+            ),
+          }));
+          console.log(`Song and cover cache removed`);
+        } catch (error) {
+          console.error("Error removing song and cover cache:", error);
+        }
+      },
+      isDownloaded: (songId: number) => {
+        const { songs } = get();
+        const song = songs.find((s) => s.id === songId);
+        return song ? song.downloaded : false;
+      },
+      getDownloadedSongBlob: async (songId: number) => {
+        try {
+          const db = await openDB("MusicPlayerDB", 1);
+          return await db.get("songs", songId.toString());
+        } catch (error) {
+          console.error("Error retrieving cached song:", error);
+          return null;
+        }
+      },
+      downloadingSongs: [],
+      addDownloadingSong: (songId) =>
+        set((state) => ({
+          downloadingSongs: [...state.downloadingSongs, songId],
+        })),
+      removeDownloadingSong: (songId) =>
+        set((state) => ({
+          downloadingSongs: state.downloadingSongs.filter(
+            (id) => id !== songId
+          ),
+        })),
     }),
     {
       name: "playlist-storage",
       partialize: (state) => ({
         loopMode: state.loopMode,
-        viewMode: state.viewMode,
         volume: state.volume,
-        songs: [],
+        songs: state.songs.map((song) => ({
+          ...song,
+          downloaded: song.downloaded,
+        })),
         searchQuery: "",
         isLoading: false,
-        setViewMode: () => {},
         setLoopMode: () => {},
         setSongs: () => {},
         setSearchQuery: () => {},
@@ -239,6 +405,22 @@ export const usePlaylistStore = create(
         duration: 0,
         setCurrentTime: () => {},
         setDuration: () => {},
+        setIsOnline: () => {},
+        isOnline: state.isOnline,
+        getTotalDuration: () => "0:00",
+        ignoredSongs: state.ignoredSongs,
+        ignoreSong: () => {},
+        unignoreSong: () => {},
+        isIgnored: () => false,
+        downloadSong: () => Promise.resolve(),
+        undownloadSong: () => Promise.resolve(),
+        isDownloaded: () => false,
+        getDownloadedSongBlob: () => Promise.resolve(null),
+        downloadingSongs: [],
+        ownloadingSongs: state.downloadingSongs,
+        addDownloadingSong: () => {},
+        removeDownloadingSong: () => {},
+        getDownloadedCoverBlob: () => Promise.resolve(null),
       }),
     }
   )
@@ -253,4 +435,15 @@ function formatDuration(seconds: number): string {
 function parseDuration(duration: string): number {
   const [minutes, seconds] = duration.split(":").map(Number);
   return minutes * 60 + seconds;
+}
+
+async function checkIfSongIsDownloaded(songId: number): Promise<boolean> {
+  try {
+    const db = await openDB("MusicPlayerDB", 1);
+    const song = await db.get("songs", songId.toString());
+    return !!song;
+  } catch (error) {
+    console.error("Error checking if song is downloaded:", error);
+    return false;
+  }
 }

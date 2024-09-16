@@ -1,6 +1,49 @@
 import type { Config } from "tailwindcss";
+import plugin from "tailwindcss/plugin";
 
-const config = {
+const radialGradientPlugin = plugin(
+  function ({ matchUtilities, theme }: { matchUtilities: any; theme: any }) {
+    matchUtilities(
+      {
+        "bg-radient": (value: string) => ({
+          "background-image": `radial-gradient(${value},var(--tw-gradient-stops))`,
+        }),
+      },
+      { values: theme("radialGradients") }
+    );
+  },
+  {
+    theme: {
+      radialGradients: _presets(),
+    },
+  }
+);
+
+function _presets() {
+  const shapes = ["circle", "ellipse"] as const;
+  const pos = {
+    c: "center",
+    t: "top",
+    b: "bottom",
+    l: "left",
+    r: "right",
+    tl: "top left",
+    tr: "top right",
+    bl: "bottom left",
+    br: "bottom right",
+  } as const;
+
+  type ShapePos = `${(typeof shapes)[number]}-${keyof typeof pos}`;
+  const result = {} as Record<ShapePos, string>;
+
+  for (const shape of shapes)
+    for (const [posName, posValue] of Object.entries(pos))
+      result[`${shape}-${posName}` as ShapePos] = `${shape} at ${posValue}`;
+
+  return result;
+}
+
+const config: Config = {
   darkMode: ["class"],
   content: [
     "./pages/**/*.{ts,tsx}",
@@ -74,7 +117,10 @@ const config = {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
-} satisfies Config;
+  future: {
+    hoverOnlyWhenSupported: true,
+  },
+  plugins: [require("tailwindcss-animate"), radialGradientPlugin],
+};
 
 export default config;

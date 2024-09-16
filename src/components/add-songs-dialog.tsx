@@ -3,6 +3,7 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
+  DialogDescription,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
@@ -227,7 +228,10 @@ export function AddSongsDialog() {
     setIsLoading(false);
   }, []);
 
-  const handleAddSongs = async (songsData: Omit<Song, "id">[], coverFiles: (File | null)[]) => {
+  const handleAddSongs = async (
+    songsData: Omit<Song, "id">[],
+    coverFiles: (File | null)[]
+  ) => {
     setIsLoading(true);
     const supabase = createClient();
 
@@ -287,12 +291,15 @@ export function AddSongsDialog() {
         <DialogTrigger asChild>
           <Button variant="outline" size="sm">
             <PlusCircle className="w-4 h-4 mr-2" />
-            Add Songs
+            Add songs
           </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[600px] max-h-[calc(100vh-20rem)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Songs</DialogTitle>
+            <DialogDescription>
+              Add songs to your playlist. You can add multiple songs at once.
+            </DialogDescription>
           </DialogHeader>
           {uploadedFiles.length === 0 ? (
             <FileDropzone onDrop={onDrop} />
