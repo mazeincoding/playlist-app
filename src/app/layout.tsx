@@ -4,6 +4,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { NetworkStatusHandler } from "@/components/network-status-handler";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ServiceWorkerRegister } from "@/components/service-worker-register";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -40,6 +41,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="dark">
           <NetworkStatusHandler />
+          <ServiceWorkerRegister />
           <TooltipProvider>{children}</TooltipProvider>
         </ThemeProvider>
       </body>
