@@ -8,7 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Your Music Player",
+  title: "Playlist App",
   description: "A PWA music player built with Next.js",
   manifest: "/manifest.json",
   themeColor: "#ffffff",
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Your Music Player",
+    title: "Playlist App",
     startupImage: ["/icon-192x192.png", "/icon-512x512.png"],
   },
   formatDetection: {
