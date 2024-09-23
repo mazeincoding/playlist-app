@@ -438,13 +438,11 @@ function SongListItem({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h3 className="font-medium truncate">{title}</h3>
-            <div className="hidden sm:block">
-              {isDownloaded(id) ? (
-                <Download className="w-4 h-4 text-green-500" />
-              ) : downloadingSongs.includes(id) ? (
-                <DownloadAnimation />
-              ) : null}
-            </div>
+            {isDownloaded(id) ? (
+              <Download className="w-4 h-4 text-green-500" />
+            ) : downloadingSongs.includes(id) ? (
+              <DownloadAnimation />
+            ) : null}
           </div>
           <p className="text-sm text-muted-foreground truncate">{artist}</p>
           <p className="text-sm text-muted-foreground truncate">{duration}</p>
@@ -516,7 +514,7 @@ function PlayerControls() {
     setCurrentTime,
     setDuration,
     getDownloadedCoverBlob,
-    isOnline
+    isOnline,
   } = usePlaylistStore();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [coverSrc, setCoverSrc] = useState(currentSong?.cover);
