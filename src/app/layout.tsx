@@ -12,7 +12,8 @@ export const metadata: Metadata = {
   description: "A PWA music player built with Next.js",
   manifest: "/manifest.json",
   themeColor: "#ffffff",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
+  viewport:
+    "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
