@@ -15,7 +15,7 @@ export default function Home() {
           <p className="text-sm sm:text-base">You're offline!</p>
         </div>
       )}
-      <div className="flex-grow overflow-y-auto">
+      <div className="flex-grow overflow-y-hidden">
         <HomeLayout />
       </div>
     </div>

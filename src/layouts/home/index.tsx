@@ -113,11 +113,8 @@ export default function HomeLayout() {
 
   return (
     <div className="flex flex-col h-full bg-background text-foreground">
-      <div
-        className="flex-grow overflow-auto relative"
-        ref={scrollContainerRef}
-      >
-        <Header />
+      <Header />
+      <div className="flex-grow relative overflow-y-auto" ref={scrollContainerRef}>
         <Main setIsCurrentSongVisible={setIsCurrentSongVisible} />
         {!isCurrentSongVisible && currentSong && (
           <Badge
@@ -206,7 +203,7 @@ function Main({
     usePlaylistStore();
 
   return (
-    <main className="flex-1 overflow-auto p-4">
+    <main className="flex-1 overflow-y-auto p-4">
       <div className="flex flex-col gap-2">
         {isLoading
           ? Array.from({ length: 10 }).map((_, index) => (
