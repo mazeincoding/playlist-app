@@ -18,6 +18,7 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "default",
     title: "Your Music Player",
+    startupImage: ["/icon-192x192.png", "/icon-512x512.png"],
   },
   formatDetection: {
     telephone: false,
@@ -31,7 +32,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head />
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#000000" />
+        <link rel="apple-touch-icon" href="/icon-192x192.png" />
+      </head>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="dark">
           <NetworkStatusHandler />
