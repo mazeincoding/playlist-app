@@ -1,6 +1,6 @@
 {
-  "name": "Your Music Player",
-  "short_name": "Music Player",
+  "name": "Playlist App",
+  "short_name": "Playlist App",
   "icons": [
     {
       "src": "/icon-192x192.png",
@@ -13,8 +13,8 @@
       "type": "image/png"
     }
   ],
-  "theme_color": "#000000FF",
-  "background_color": "#000000FF",
+  "theme_color": "#110D0B",
+  "background_color": "#110D0B",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait"
